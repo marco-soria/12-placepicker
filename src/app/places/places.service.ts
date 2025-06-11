@@ -3,11 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { catchError, map, tap, throwError } from 'rxjs';
 
 import { Place } from './place.model';
+import { ErrorService } from '../shared/error.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class PlacesService {
+  private errorService = inject(ErrorService);
   private httpClient = inject(HttpClient);
   private userPlaces = signal<Place[]>([]);
 
@@ -26,19 +28,18 @@ export class PlacesService {
       'Something went wrong fetching your favorite places. Please try again later.'
     ).pipe(
       tap({
-        next: (places) => {
-          this.userPlaces.set(places);
-        },
+        next: (userPlaces) => this.userPlaces.set(userPlaces),
       })
     );
   }
 
   addPlaceToUserPlaces(place: Place) {
     const prevPlaces = this.userPlaces();
-    //this.userPlaces.update((prevPlaces) => [...prevPlaces, place]);
+
     if (!prevPlaces.some((p) => p.id === place.id)) {
       this.userPlaces.set([...prevPlaces, place]);
     }
+
     return this.httpClient
       .put('http://localhost:3000/user-places', {
         placeId: place.id,
@@ -46,12 +47,8 @@ export class PlacesService {
       .pipe(
         catchError((error) => {
           this.userPlaces.set(prevPlaces);
-          return throwError(
-            () =>
-              new Error(
-                'Something went wrong adding the place to your favorites. Please try again later.'
-              )
-          );
+          this.errorService.showError('Failed to store selected place.');
+          return throwError(() => new Error('Failed to store selected place.'));
         })
       );
   }
